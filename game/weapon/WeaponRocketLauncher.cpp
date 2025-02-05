@@ -51,6 +51,8 @@ protected:
 
 private:
 
+	int					fireHeldTime;
+	int					chargeTime;
 	stateResult_t		State_Idle				( const stateParms_t& parms );
 	stateResult_t		State_Fire				( const stateParms_t& parms );
 	stateResult_t		State_Raise				( const stateParms_t& parms );
@@ -442,14 +444,37 @@ stateResult_t rvWeaponRocketLauncher::State_Fire ( const stateParms_t& parms ) {
 	enum {
 		STAGE_INIT,
 		STAGE_WAIT,
+		STATE_FIRE,
+		STATE_CHARGE
 	};	
 	switch ( parms.stage ) {
 		case STAGE_INIT:
-			nextAttackTime = gameLocal.time + (fireRate * owner->PowerUpModifier ( PMOD_FIRERATE ));		
-			Attack(false, 3, spread, 0, 1.0f);
-			PlayAnim ( ANIMCHANNEL_LEGS, "fire", parms.blendFrames );	
-			return SRESULT_STAGE ( STAGE_WAIT );
-	
+			chargeTime = gameLocal.time;
+			fireHeldTime = 0;
+			return SRESULT_STAGE(STATE_CHARGE);
+
+		case STATE_CHARGE:
+			
+			if (wsfl.attack) {
+				fireHeldTime = gameLocal.time;
+				if (fireHeldTime - chargeTime > 4000) {
+					fireHeldTime = 4000;
+				}
+				return SRESULT_WAIT;
+			}
+			return SRESULT_STAGE(STATE_FIRE);
+		case STATE_FIRE:
+			nextAttackTime = gameLocal.time + (fireRate * owner->PowerUpModifier(PMOD_FIRERATE));
+			if(fireHeldTime - chargeTime > 1500){
+				Attack(false, 6, spread * chargeTime, 0, 1.0f);
+				PlayAnim(ANIMCHANNEL_LEGS, "chargedfire", parms.blendFrames);
+			}
+			else {
+				Attack(false, 3, spread, 0, 1.0f);
+				PlayAnim(ANIMCHANNEL_LEGS, "fire", parms.blendFrames);
+			}
+
+			return SRESULT_STAGE(STAGE_WAIT);
 		case STAGE_WAIT:			
 			if ( wsfl.attack && gameLocal.time >= nextAttackTime && ( gameLocal.isClient || AmmoInClip ( ) ) && !wsfl.lowerWeapon ) {
 				SetState ( "Fire", 0 );
